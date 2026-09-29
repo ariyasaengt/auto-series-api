@@ -1,17 +1,11 @@
 import os
-import asyncio
 import subprocess
 import requests
 from flask import Flask, request, jsonify, send_file
-import edge_tts
+from gtts import gTTS
 import imageio_ffmpeg
 
 app = Flask(__name__)
-
-# ฟังก์ชันสร้างเสียงพากย์ด้วย Python API โดยตรง (แก้ปัญหา CLI พัง)
-async def create_audio(text, output_path):
-    communicate = edge_tts.Communicate(text, 'th-TH-PremwadeeNeural')
-    await communicate.save(output_path)
 
 @app.route('/generate', methods=['POST'])
 def generate_video():
@@ -27,14 +21,15 @@ def generate_video():
         image_path = "temp_image.jpg"
         video_path = "output_video.mp4"
 
-        # เคลียร์ไฟล์เก่าทิ้ง ป้องกันการเขียนทับพลาด
+        # เคลียร์ไฟล์เก่าทิ้ง
         for file in [audio_path, image_path, video_path]:
             if os.path.exists(file):
                 os.remove(file)
 
-        # 1. สร้างเสียงพากย์
-        print("Generating audio...")
-        asyncio.run(create_audio(text, audio_path))
+        # 1. สร้างเสียงพากย์ด้วย Google TTS (เสถียรกว่าบน Cloud)
+        print("Generating audio with gTTS...")
+        tts = gTTS(text=text, lang='th')
+        tts.save(audio_path)
 
         # 2. ดาวน์โหลดรูปภาพ
         print("Downloading image...")
@@ -45,10 +40,10 @@ def generate_video():
         else:
             return jsonify({"error": "Failed to download image"}), 400
 
-        # 3. ดึงเส้นทางโปรแกรม ffmpeg (แก้ปัญหา Render ไม่มีตัวตัดต่อ)
+        # 3. ดึงเส้นทางโปรแกรม ffmpeg
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 
-        # 4. ตัดต่อภาพและเสียงเข้าด้วยกัน พร้อมซูมภาพเบาๆ
+        # 4. ตัดต่อภาพและเสียงเข้าด้วยกัน
         print("Generating video with ffmpeg...")
         ffmpeg_cmd = [
             ffmpeg_exe, '-y',
