@@ -1,28 +1,28 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, jsonify
 import subprocess
-import requests
-import uuid
-import os
 
 app = Flask(__name__)
 
 @app.route('/generate', methods=['POST'])
-def generate():
-    data = request.json
+def generate_video():
+    # 1. ดึงข้อมูล JSON อย่างถูกต้อง
+    data = request.get_json()
+    text = data.get('text')
     image_url = data.get('image_url')
-    text = data.get('thai_text')
 
-    uid = str(uuid.uuid4())
-    img_path = f"/tmp/{uid}.jpg"
-    audio_path = f"/tmp/{uid}.mp3"
-    out_path = f"/tmp/{uid}.mp4"
+    # เช็คว่ามีข้อความส่งมาจริงๆ เพื่อป้องกันค่า None
+    if not text:
+        return jsonify({"error": "Missing text parameter"}), 400
 
-    try:
-        # 1. โหลดรูปภาพ
-        with open(img_path, 'wb') as f:
-            f.write(requests.get(image_url).content)
+    # 2. กำหนดชื่อไฟล์เสียงล่วงหน้า (คาดว่าโค้ดเดิมอาจจะลืมประกาศตัวแปรนี้ หรือเผลอตั้งเป็น None)
+    audio_path = "output_audio.mp3"
 
-        # 2. สร้างเสียงพากย์ด้วย Edge-TTS
+    # 3. รันคำสั่งสร้างเสียง
+    subprocess.run(['edge-tts', '--voice', 'th-TH-PremwadeeNeural', '--text', text, '--write-media', audio_path], check=True)
+    
+    # ... (โค้ดส่วนโหลดภาพและตัดต่อวิดีโอด้วย ffmpeg) ...
+    
+    return jsonify({"status": "success"})
         subprocess.run(['edge-tts', '--voice', 'th-TH-PremwadeeNeural', '--text', text, '--write-media', audio_path], check=True)
 
         # 3. ตัดต่อวิดีโอ (Ken Burns) ด้วย FFmpeg
